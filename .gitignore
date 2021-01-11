@@ -1,0 +1,76 @@
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+*.d
+*.class
+
+# Folders
+_obj
+_test
+bin
+pkg
+tmp
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+main
+tga2png
+
+# Project files
+*.sublime-project
+*.sublime-workspace
+.vscode
+.project
+.idea
+
+# OS generated files
+.DS_Store*
+*.db
+Icon?
+Thumbs.db
+
+# Logs and databases
+logs
+*.log
+*.sql
+*.sqlite
+
+# Packages
+*.dmg
+*.iso
+*.jar
+*.7z
+*.bz2
+*.gz
+*.xz
+*.zip
+*.rar
+*.tar
+
+# Tags
+tags
+TAGS
+
+# Application file
+pose
+*.pose
+config.ini
