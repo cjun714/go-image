@@ -36,7 +36,6 @@ func decodeRGBAInto(data, output []byte, stride int) ([]byte, error) {
 
 func Decode(data []byte) (image.Image, error) {
 	w, h, e := getWebpInfo(data)
-	fmt.Println(w, h)
 	if e != nil {
 		return nil, e
 	}
