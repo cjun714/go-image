@@ -117,6 +117,17 @@ func Encode(img image.Image, quality int) ([]byte, error) {
 		} else {
 			byts, e = encodeRGBA(t.Pix, w, h, t.Stride, float32(quality))
 		}
+	case *image.Gray:
+		pix := make([]byte, w*h*3)
+		length := len(t.Pix)
+		for i := 0; i < length; i++ {
+			pix[i*3], pix[i*3+1], pix[i*3+2] = t.Pix[i], t.Pix[i], t.Pix[i]
+		}
+		if quality >= 100 {
+			byts, e = encodeLosslessRGB(pix, w, h, w*3)
+		} else {
+			byts, e = encodeRGB(pix, w, h, w*3, float32(quality))
+		}
 	case *image.YCbCr:
 		pix := make([]byte, w*h*3)
 		idx := 0
