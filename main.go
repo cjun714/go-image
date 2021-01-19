@@ -4,6 +4,7 @@ import (
 	"image"
 	_ "image/jpeg"
 	_ "image/png"
+	"io/ioutil"
 	"os"
 
 	"github.com/cjun714/go-image/webp"
@@ -41,28 +42,28 @@ func main() {
 		panic(e)
 	}
 
-	// bs, e := ioutil.ReadFile("z:/test.jpg")
-	// if e != nil {
-	// 	panic(e)
-	// }
+	bs, e := ioutil.ReadFile("z:/test.jpg")
+	if e != nil {
+		panic(e)
+	}
 
-	// f, e := os.Create("z:/ttt.webp")
-	// if e != nil {
-	// 	panic(e)
-	// }
-	// defer f.Close()
+	f, e = os.Create("z:/ttt.webp")
+	if e != nil {
+		panic(e)
+	}
+	defer f.Close()
 
-	// opt, e := webp.ConfigPreset(webp.PRESET_DEFAULT, 85)
-	// if e != nil {
-	// 	panic(e)
-	// }
-	// // config.SetLossless(true)
-	// // config.SetSNSStrength(100)
-	// // config.SetFilterStrength(100)
-	// // config.SetFilterSharpness(7)
-	// e = webp.EncodeBytes(f, bs, opt)
-	// if e != nil {
-	// 	panic(e)
-	// }
+	opt, e := webp.ConfigPreset(webp.PRESET_DEFAULT, 85)
+	if e != nil {
+		panic(e)
+	}
+	// config.SetLossless(true)
+	// config.SetSNSStrength(100)
+	// config.SetFilterStrength(100)
+	// config.SetFilterSharpness(7)
+	e = webp.EncodeBytes(f, bs, opt)
+	if e != nil {
+		panic(e)
+	}
 
 }
