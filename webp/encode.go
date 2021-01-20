@@ -269,6 +269,14 @@ func EncodePixBytes(w io.Writer, pix []byte, width, height, comps int, opt *Opti
 		C.WebPPictureImportRGBA(pic, (*C.uint8_t)(&pix[0]), C.int(width*4))
 	case 3:
 		C.WebPPictureImportRGB(pic, (*C.uint8_t)(&pix[0]), C.int(width*3))
+	case 2:
+		pixCount := width * height
+		p := make([]byte, pixCount*4)
+		for i := 0; i < int(pixCount); i++ {
+			p[i*4], p[i*4+1], p[i*4+2] = pix[i*2], pix[i*2], pix[i*2]
+			p[i*4+3] = pix[i*2+1]
+		}
+		C.WebPPictureImportRGBA(pic, (*C.uint8_t)(unsafe.Pointer(&p[0])), C.int(width*4))
 	case 1:
 		pixCount := width * height
 		p := make([]byte, pixCount*3)
