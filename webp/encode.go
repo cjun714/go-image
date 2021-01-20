@@ -226,12 +226,17 @@ func Encode(w io.Writer, img image.Image, opt *Option) error {
 }
 
 func EncodeBytes(w io.Writer, data []byte, opt *Option) error {
-	pix, width, height, comps, e := stb.LoadBytes(data)
+	pixPtr, width, height, comps, e := stb.LoadBytes(data)
 	if e != nil {
 		return e
 	}
-	defer stb.Free(pix)
+	defer stb.Free(pixPtr)
 
+	pix := C.GoBytes(unsafe.Pointer(pixPtr), C.int(width*height*comps))
+	return EncodePixBytes(w, pix, width, height, comps, opt)
+}
+
+func EncodePixBytes(w io.Writer, pix []byte, width, height, comps int, opt *Option) error {
 	if C.WebPValidateConfig(&opt.config) == 0 {
 		return errors.New("invalid WebPConfig")
 	}
@@ -261,16 +266,14 @@ func EncodeBytes(w io.Writer, data []byte, opt *Option) error {
 
 	switch comps {
 	case 4:
-		C.WebPPictureImportRGBA(pic, (*C.uint8_t)(pix), C.int(width*4))
+		C.WebPPictureImportRGBA(pic, (*C.uint8_t)(&pix[0]), C.int(width*4))
 	case 3:
-		C.WebPPictureImportRGB(pic, (*C.uint8_t)(pix), C.int(width*3))
+		C.WebPPictureImportRGB(pic, (*C.uint8_t)(&pix[0]), C.int(width*3))
 	case 1:
 		pixCount := width * height
 		p := make([]byte, pixCount*3)
-		byts := C.GoBytes(unsafe.Pointer(pix), C.int(pixCount))
-
 		for i := 0; i < int(pixCount); i++ {
-			p[i*3], p[i*3+1], p[i*3+2] = byts[i], byts[i], byts[i]
+			p[i*3], p[i*3+1], p[i*3+2] = pix[i], pix[i], pix[i]
 		}
 		C.WebPPictureImportRGB(pic, (*C.uint8_t)(unsafe.Pointer(&p[0])), C.int(width*3))
 	default:
@@ -294,7 +297,7 @@ func EncodeBytes(w io.Writer, data []byte, opt *Option) error {
 
 	byts := C.GoBytes(unsafe.Pointer(mr.mem), C.int(mr.size))
 
-	_, e = w.Write(byts)
+	_, e := w.Write(byts)
 	if e != nil {
 		return e
 	}
