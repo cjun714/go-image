@@ -51,15 +51,15 @@ const (
 
 var tgaSignature = []byte("TRUEVISION-XFILE.\x00")
 
-func newFooter() *rawFooter {
-	f := &rawFooter{}
-	copy(f.Signature[:], tgaSignature)
-	return f
-}
+// func newFooter() *rawFooter {
+// 	f := &rawFooter{}
+// 	copy(f.Signature[:], tgaSignature)
+// 	return f
+// }
 
-func newExtArea(attrType byte) []byte {
-	area := make([]byte, extAreaAttrTypeOffset+1)
-	area[0], area[1] = 0xef, 0x01 // size
-	area[extAreaAttrTypeOffset] = attrType
-	return area
-}
+// func newExtArea(attrType byte) []byte {
+// 	area := make([]byte, extAreaAttrTypeOffset+1)
+// 	area[0], area[1] = 0xef, 0x01 // size
+// 	area[extAreaAttrTypeOffset] = attrType
+// 	return area
+// }

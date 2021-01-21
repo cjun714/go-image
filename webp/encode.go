@@ -23,222 +23,182 @@ import (
 	_ "image/png"
 	"io"
 	"unsafe"
-
-	"github.com/cjun714/go-image-stb/stb"
 )
 
-// Config specifies WebP encoding configuration.
-type Option struct {
-	config       C.WebPConfig
-	resizeScale  float32
-	resizeWidth  int
-	resizeHeight int
-}
-
-type PresetENUM int
+type SetENUM int
 
 const (
-	PRESET_DEFAULT PresetENUM = C.WEBP_PRESET_DEFAULT
+	SET_DEFAULT SetENUM = C.WEBP_PRESET_DEFAULT
 	// for digital picture, like portrait, inner shot
-	PRESET_PICTURE PresetENUM = C.WEBP_PRESET_PICTURE
+	SET_PICTURE SetENUM = C.WEBP_PRESET_PICTURE
 	// for outdoor photograph, with natural lighting
-	PRESET_PHOTO PresetENUM = C.WEBP_PRESET_PHOTO
+	SET_PHOTO SetENUM = C.WEBP_PRESET_PHOTO
 	// for hand or line drawing, with high-contrast details
-	PRESET_DRAWING PresetENUM = C.WEBP_PRESET_DRAWING
+	SET_DRAWING SetENUM = C.WEBP_PRESET_DRAWING
 	// for small-sized colorful images
-	PRESET_ICON PresetENUM = C.WEBP_PRESET_ICON
+	SET_ICON SetENUM = C.WEBP_PRESET_ICON
 	// for text-like
-	PRESET_TEXT PresetENUM = C.WEBP_PRESET_TEXT
+	SET_TEXT SetENUM = C.WEBP_PRESET_TEXT
 )
 
-// SetMultiThreadLevel set multi-thread level. 0(off), 1(on)
-func (o *Option) SetMultiThreadLevel(v int) {
-	o.config.thread_level = C.int(v)
+type EncErrorENUM int
+
+const (
+	ERR_ENC_OK EncErrorENUM = iota
+	ERR_ENC_OUT_OF_MEMORY
+	ERR_ENC_BITSTREAM_OUT_OF_MEMORY
+	ERR_ENC_NULL_PARAMETER
+	ERR_ENC_INVALID_CONFIGURATION
+	ERR_ENC_BAD_DIMENSION
+	ERR_ENC_PARTITION0_OVERFLOW
+	ERR_ENC_PARTITION_OVERFLOW
+	ERR_ENC_BAD_WRITE
+	ERR_ENC_FILE_TOO_BIG
+	ERR_ENC_USER_ABORT
+	ERR_ENC_ERROR_LAST
+)
+
+func (e EncErrorENUM) String() string {
+	switch e {
+	case ERR_ENC_OUT_OF_MEMORY:
+		return "memory error allocating objects"
+	case ERR_ENC_BITSTREAM_OUT_OF_MEMORY:
+		return "memory error while flushing bits"
+	case ERR_ENC_NULL_PARAMETER:
+		return "a pointer parameter is NULL"
+	case ERR_ENC_INVALID_CONFIGURATION:
+		return "configuration is invalid"
+	case ERR_ENC_BAD_DIMENSION:
+		return "picture has invalid width/height"
+	case ERR_ENC_PARTITION0_OVERFLOW:
+		return "partition is bigger than 512k"
+	case ERR_ENC_PARTITION_OVERFLOW:
+		return "partition is bigger than 16M"
+	case ERR_ENC_BAD_WRITE:
+		return "error while flushing bytes"
+	case ERR_ENC_FILE_TOO_BIG:
+		return "file is bigger than 4G"
+	case ERR_ENC_USER_ABORT:
+		return "abort request by user"
+	case ERR_ENC_ERROR_LAST:
+		return "list terminator. always last."
+	default:
+		return "undefined error"
+	}
 }
 
-// SetSNSStrength set Spatial Noise Shaping.  0(off) - 100(max).
-func (o *Option) SetSNSStrength(v int) {
-	o.config.sns_strength = C.int(v)
+// Option specifies WebP encoding configuration.
+type Option struct {
+	config        C.WebPConfig
+	webp_preset   SetENUM
+	webp_quality  int
+	webp_lossless bool
+	resizeScale   float32
+	resizeWidth   int
+	resizeHeight  int
 }
 
-// SetLossless set Loossless
+func NewConfig(set SetENUM, quality int) *Option {
+	opt := &Option{}
+	opt.webp_preset = set
+	opt.webp_quality = quality
+
+	return opt
+}
+
+func (o *Option) intWebpConfig() error {
+	if C.WebPConfigPreset(&o.config,
+		C.WebPPreset(o.webp_preset), C.float(o.webp_quality)) == 0 {
+		return errors.New("init WebPConfig failed")
+	}
+
+	// important: this keep color as same as source, but increases size.
+	o.config.use_sharp_yuv = C.int(1)
+	o.config.lossless = bool2int(o.webp_lossless)
+
+	o.config.segments = C.int(4)
+	o.config.filter_strength = C.int(100)
+	o.config.filter_sharpness = C.int(7)
+	o.config.filter_type = C.int(1) // strong
+
+	if C.WebPValidateConfig(&o.config) == 0 {
+		return errors.New("invalid WebPConfig")
+	}
+
+	return nil
+}
+
 func (o *Option) SetLossless(v bool) {
-	o.config.lossless = bool2int(v)
-}
-
-// SetFilterStrength set filter strength. 0(off) - 100(strongest)
-func (o *Option) SetFilterStrength(v int) {
-	o.config.filter_strength = C.int(v)
-}
-
-// SetFilterSharpness set filter sharpness. 0(off) - 7(max)
-func (o *Option) SetFilterSharpness(v int) {
-	o.config.filter_sharpness = C.int(v)
+	o.webp_lossless = v
 }
 
 func (o *Option) SetResizeScale(v float32) {
 	o.resizeScale = v
 }
 
-func (o *Option) SetResizeHeight(v int) {
-	o.resizeHeight = v
-}
-
-func (o *Option) SetResizeWidth(v int) {
-	o.resizeWidth = v
-}
-
-func ConfigPreset(preset PresetENUM, quality int) (*Option, error) {
-	opt := &Option{}
-	if C.WebPConfigPreset(&opt.config, C.WebPPreset(preset), C.float(quality)) == 0 {
-		return nil, errors.New("init WebPConfig failed")
-	}
-
-	// important: enable this to keep color as original as possiable, also
-	// increases encoding size.
-	opt.config.use_sharp_yuv = C.int(1)
-
-	return opt, nil
+func (o *Option) SetResize(width, height int) {
+	o.resizeWidth, o.resizeHeight = width, height
+	o.resizeScale = 0
 }
 
 func Encode(w io.Writer, img image.Image, opt *Option) error {
-	if C.WebPValidateConfig(&opt.config) == 0 {
-		return errors.New("invalid WebPConfig")
-	}
-
-	// alloc pic in c memory to avoid 'cgo argument has Go pointer to Go pointer'
-	pic := C.calloc_WebPPicture()
-	if pic == nil {
-		return errors.New("alloc WebPPicture failed")
-	}
-	defer C.free_WebPPicture(pic)
-
-	if C.WebPPictureInit(pic) == 0 {
-		return errors.New("init WebPPicture failed")
-	}
-	defer C.WebPPictureFree(pic)
-
 	width := img.Bounds().Dx()
 	height := img.Bounds().Dy()
 
-	pic.use_argb = 1
-	pic.width = C.int(width)
-	pic.height = C.int(height)
-
-	mr := &C.WebPMemoryWriter{}
-	C.WebPMemoryWriterInit(mr)
-	defer C.WebPMemoryWriterClear(mr)
-
-	pic.custom_ptr = unsafe.Pointer(mr)
-	pic.writer = C.WebPWriterFunction(C.WebPMemoryWrite)
-
 	switch p := img.(type) {
 	case *image.RGBA:
-		C.WebPPictureImportRGBA(pic, (*C.uint8_t)(&p.Pix[0]), C.int(p.Stride))
+		return EncodeBytes(w, p.Pix, width, height, 4, opt)
 	case *image.NRGBA:
-		C.WebPPictureImportRGBA(pic, (*C.uint8_t)(&p.Pix[0]), C.int(p.Stride))
+		return EncodeBytes(w, p.Pix, width, height, 4, opt)
 	case *image.Gray:
 		pix := make([]byte, width*height*3)
 		idx := 0
 		for y := 0; y < height; y++ {
 			for x := 0; x < width; x++ {
 				c := p.GrayAt(x, y)
-				pix[idx*3] = c.Y
-				pix[idx*3+1] = c.Y
-				pix[idx*3+2] = c.Y
+				pix[idx*3], pix[idx*3+1], pix[idx*3+2] = c.Y, c.Y, c.Y
 				idx++
 			}
 		}
-		C.WebPPictureImportRGB(pic, (*C.uint8_t)(unsafe.Pointer(&pix[0])), C.int(width*3))
+		return EncodeBytes(w, pix, width, height, 3, opt)
 	case *image.YCbCr:
-		if p.SubsampleRatio == image.YCbCrSubsampleRatio420 {
-			pic.use_argb = 0
-			pic.colorspace = C.WEBP_YUV420
-			pic.y, pic.u, pic.v = (*C.uint8_t)(&p.Y[0]), (*C.uint8_t)(&p.Cb[0]), (*C.uint8_t)(&p.Cr[0])
-			pic.y_stride, pic.uv_stride = C.int(p.YStride), C.int(p.CStride)
-		} else {
-			pix := make([]byte, width*height*3)
-			idx := 0
-			for y := 0; y < height; y++ {
-				for x := 0; x < width; x++ {
-					c := p.YCbCrAt(x, y)
-					pix[idx], pix[idx+1], pix[idx+2] = color.YCbCrToRGB(c.Y, c.Cb, c.Cr)
-					idx += 3
-				}
+		pix := make([]byte, width*height*3)
+		idx := 0
+		for y := 0; y < height; y++ {
+			for x := 0; x < width; x++ {
+				c := p.YCbCrAt(x, y)
+				pix[idx], pix[idx+1], pix[idx+2] = color.YCbCrToRGB(c.Y, c.Cb, c.Cr)
+				idx += 3
 			}
-			C.WebPPictureImportRGB(pic, (*C.uint8_t)(&pix[0]), C.int(width*3))
 		}
+		return EncodeBytes(w, pix, width, height, 3, opt)
 	case *image.NYCbCrA:
-		if p.SubsampleRatio == image.YCbCrSubsampleRatio420 {
-			pic.use_argb = 0
-			pic.colorspace = C.WEBP_YUV420A
-			pic.y, pic.u, pic.v = (*C.uint8_t)(&p.Y[0]), (*C.uint8_t)(&p.Cb[0]), (*C.uint8_t)(&p.Cr[0])
-			pic.a = (*C.uint8_t)(&p.A[0])
-			pic.y_stride, pic.uv_stride = C.int(p.YStride), C.int(p.CStride)
-			pic.a_stride = C.int(p.AStride)
-		} else {
-			pix := make([]byte, width*height*4)
-			idx := 0
-			for y := 0; y < height; y++ {
-				for x := 0; x < width; x++ {
-					c := p.NYCbCrAAt(x, y)
-					pix[idx], pix[idx+1], pix[idx+2] = color.YCbCrToRGB(c.Y, c.Cb, c.Cr)
-					pix[idx] = c.A
-					idx += 4
-				}
+		pix := make([]byte, width*height*4)
+		idx := 0
+		for y := 0; y < height; y++ {
+			for x := 0; x < width; x++ {
+				c := p.NYCbCrAAt(x, y)
+				pix[idx], pix[idx+1], pix[idx+2] = color.YCbCrToRGB(c.Y, c.Cb, c.Cr)
+				pix[idx] = c.A
+				idx += 4
 			}
-			C.WebPPictureImportRGBA(pic, (*C.uint8_t)(&pix[0]), C.int(width*4))
 		}
+		return EncodeBytes(w, pix, width, height, 4, opt)
 	default:
-		fmt.Printf("unsupported image type: %T\n", p)
+		fmt.Printf("unsupported image type: %T, convert into NRGBA\n", p)
 		im := image.NewNRGBA(image.Rect(0, 0, width, height))
 		for y := 0; y < height; y++ {
 			for x := 0; x < width; x++ {
 				im.Set(x, y, img.At(x, y))
 			}
 		}
-		C.WebPPictureImportRGBA(pic, (*C.uint8_t)(&im.Pix[0]), C.int(width*4))
+		return EncodeBytes(w, im.Pix, width, height, 4, opt)
 	}
-
-	if opt.resizeScale != 0.0 && opt.resizeScale != 1.0 &&
-		opt.resizeWidth == 0 && opt.resizeHeight == 0 {
-		opt.resizeWidth = int(float32(width) * opt.resizeScale)
-		opt.resizeHeight = int(float32(height) * opt.resizeScale)
-	}
-	if opt.resizeWidth != 0 || opt.resizeHeight != 0 {
-		if C.WebPPictureRescale(pic, C.int(opt.resizeWidth), C.int(opt.resizeHeight)) == 0 {
-			return errors.New("resize failed")
-		}
-	}
-
-	if C.WebPEncode(&opt.config, pic) == 0 {
-		return fmt.Errorf("encoding web failed, error code: %d", pic.error_code)
-	}
-
-	byts := C.GoBytes(unsafe.Pointer(mr.mem), C.int(mr.size))
-
-	_, e := w.Write(byts)
-	if e != nil {
-		return e
-	}
-
-	return nil
 }
 
-func EncodeBytes(w io.Writer, data []byte, opt *Option) error {
-	pixPtr, width, height, comps, e := stb.LoadBytes(data)
-	if e != nil {
+func EncodeBytes(w io.Writer, pix []byte, width, height, comps int, opt *Option) error {
+	if e := opt.intWebpConfig(); e != nil {
 		return e
-	}
-	defer stb.Free(pixPtr)
-
-	pix := C.GoBytes(unsafe.Pointer(pixPtr), C.int(width*height*comps))
-	return EncodePixBytes(w, pix, width, height, comps, opt)
-}
-
-func EncodePixBytes(w io.Writer, pix []byte, width, height, comps int, opt *Option) error {
-	if C.WebPValidateConfig(&opt.config) == 0 {
-		return errors.New("invalid WebPConfig")
 	}
 
 	// alloc pic in c memory to avoid 'cgo argument has Go pointer to Go pointer'
@@ -288,8 +248,7 @@ func EncodePixBytes(w io.Writer, pix []byte, width, height, comps int, opt *Opti
 		return errors.New("not support image type")
 	}
 
-	if opt.resizeScale != 0.0 && opt.resizeScale != 1.0 &&
-		opt.resizeWidth != 0 && opt.resizeHeight != 0 {
+	if opt.resizeScale != 0.0 && opt.resizeScale != 1.0 {
 		opt.resizeWidth = int(float32(width) * opt.resizeScale)
 		opt.resizeHeight = int((float32(height) * opt.resizeScale))
 	}
@@ -300,11 +259,10 @@ func EncodePixBytes(w io.Writer, pix []byte, width, height, comps int, opt *Opti
 	}
 
 	if C.WebPEncode(&opt.config, pic) == 0 {
-		return fmt.Errorf("encoding webp failed, error code: %d", pic.error_code)
+		return fmt.Errorf("encoding webp failed, error: %s", EncErrorENUM(pic.error_code))
 	}
 
 	byts := C.GoBytes(unsafe.Pointer(mr.mem), C.int(mr.size))
-
 	_, e := w.Write(byts)
 	if e != nil {
 		return e
