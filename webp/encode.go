@@ -44,43 +44,43 @@ const (
 type EncErrorENUM int
 
 const (
-	ERR_ENC_OK EncErrorENUM = iota
-	ERR_ENC_OUT_OF_MEMORY
-	ERR_ENC_BITSTREAM_OUT_OF_MEMORY
-	ERR_ENC_NULL_PARAMETER
-	ERR_ENC_INVALID_CONFIGURATION
-	ERR_ENC_BAD_DIMENSION
-	ERR_ENC_PARTITION0_OVERFLOW
-	ERR_ENC_PARTITION_OVERFLOW
-	ERR_ENC_BAD_WRITE
-	ERR_ENC_FILE_TOO_BIG
-	ERR_ENC_USER_ABORT
-	ERR_ENC_ERROR_LAST
+	ENC_OK EncErrorENUM = iota
+	ENC_ERR_OUT_OF_MEMORY
+	ENC_ERR_BITSTREAM_OUT_OF_MEMORY
+	ENC_ERR_NULL_PARAMETER
+	ENC_ERR_INVALID_CONFIGURATION
+	ENC_ERR_BAD_DIMENSION
+	ENC_ERR_PARTITION0_OVERFLOW
+	ENC_ERR_PARTITION_OVERFLOW
+	ENC_ERR_BAD_WRITE
+	ENC_ERR_FILE_TOO_BIG
+	ENC_ERR_USER_ABORT
+	ENC_ERR_ERROR_LAST
 )
 
 func (e EncErrorENUM) String() string {
 	switch e {
-	case ERR_ENC_OUT_OF_MEMORY:
+	case ENC_ERR_OUT_OF_MEMORY:
 		return "memory error allocating objects"
-	case ERR_ENC_BITSTREAM_OUT_OF_MEMORY:
+	case ENC_ERR_BITSTREAM_OUT_OF_MEMORY:
 		return "memory error while flushing bits"
-	case ERR_ENC_NULL_PARAMETER:
+	case ENC_ERR_NULL_PARAMETER:
 		return "a pointer parameter is NULL"
-	case ERR_ENC_INVALID_CONFIGURATION:
+	case ENC_ERR_INVALID_CONFIGURATION:
 		return "configuration is invalid"
-	case ERR_ENC_BAD_DIMENSION:
+	case ENC_ERR_BAD_DIMENSION:
 		return "picture has invalid width/height"
-	case ERR_ENC_PARTITION0_OVERFLOW:
+	case ENC_ERR_PARTITION0_OVERFLOW:
 		return "partition is bigger than 512k"
-	case ERR_ENC_PARTITION_OVERFLOW:
+	case ENC_ERR_PARTITION_OVERFLOW:
 		return "partition is bigger than 16M"
-	case ERR_ENC_BAD_WRITE:
+	case ENC_ERR_BAD_WRITE:
 		return "error while flushing bytes"
-	case ERR_ENC_FILE_TOO_BIG:
+	case ENC_ERR_FILE_TOO_BIG:
 		return "file is bigger than 4G"
-	case ERR_ENC_USER_ABORT:
+	case ENC_ERR_USER_ABORT:
 		return "abort request by user"
-	case ERR_ENC_ERROR_LAST:
+	case ENC_ERR_ERROR_LAST:
 		return "list terminator. always last."
 	default:
 		return "undefined error"
@@ -112,14 +112,11 @@ func (o *Option) intWebpConfig() error {
 		return errors.New("init WebPConfig failed")
 	}
 
-	// important: this keep color as same as source, but increases size.
-	o.config.use_sharp_yuv = C.int(1)
 	o.config.lossless = bool2int(o.webp_lossless)
 
-	o.config.segments = C.int(4)
-	o.config.filter_strength = C.int(100)
-	o.config.filter_sharpness = C.int(7)
-	o.config.filter_type = C.int(1) // strong
+	o.config.use_sharp_yuv = C.int(1) // keep color as original as source
+	o.config.preprocessing = C.int(1)
+	o.config.partitions = C.int(3)
 
 	if C.WebPValidateConfig(&o.config) == 0 {
 		return errors.New("invalid WebPConfig")
